@@ -1,8 +1,11 @@
 import sys
-
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
     QMainWindow, QMessageBox, QFileDialog
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtWidgets import QApplication as qapp
 from wdc import encrypt, decrypt
+
+
 
 class Interface:
     def __init__(self, mainWindow):
@@ -140,10 +143,21 @@ class Interface:
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+
+
+    loader = QUiLoader()
+
+    app = qapp(sys.argv)
+
+    window = loader.load("testUI.ui", None)
+
+    window.show()
+
     app.setStyle('Fusion')
-    window = QMainWindow()
+
+    #window = QMainWindow()
+
     window.resize(300, 300)
-    appInterface = Interface(window)
+    #appInterface = Interface(window)
 
     sys.exit(app.exec_())
