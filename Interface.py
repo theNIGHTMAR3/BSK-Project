@@ -23,10 +23,13 @@ class Interface:
         self.isCBC = True
         self.isConnected = False
 
-        self.status = QLabel()
 
         self.widget = QWidget(mainWindow)
         flo = QFormLayout()
+
+        self.status = QLabel()
+        flo.addRow("STATUS:", self.status)
+        self.setStatus(False)
 
         self.buttonGroup1 = QButtonGroup()
         self.buttonGroup2 = QButtonGroup()
@@ -96,6 +99,8 @@ class Interface:
         mainWindow.setCentralWidget(self.widget)
         mainWindow.show()
 
+    def setSocket(self,socket):
+        self.socket=socket
     def clearForm(self):
         self.inputFile.setText("Choose input file")
         self.inputFilename = ""
@@ -200,11 +205,15 @@ class Interface:
     def setIsCBC(self, isCBC):
         self.isCBC = isCBC
 
-    #def setStatus(self):
-
+    def setStatus(self,status : bool):
+        self.isConnected=status
         if self.isConnected:
             self.status.setText("CONNECTED")
-            self.status.setStyle()
+            self.status.setStyleSheet("color : green")
+        else:
+            self.status.setText("DISCONNECTED")
+            self.status.setStyleSheet("color : red")
+
 
 
     def showSuccessDialog(self, text):

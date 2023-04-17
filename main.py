@@ -120,6 +120,8 @@ if __name__ == "__main__":
 
     # SERVER Mode
     if mode=="server":
+
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('localhost', 2137))
         s.listen(3)
@@ -129,6 +131,7 @@ if __name__ == "__main__":
         s.settimeout(2)
 
         appInterface = Interface(window, c)
+        appInterface.setStatus(True)
 
         thread = Thread(target=recv_file, args=(c, ))
         thread.start()
@@ -147,7 +150,6 @@ if __name__ == "__main__":
 
     # CLIENT Mode
     if mode == "client":
-
         s = socket.socket()
 
         port = 2137
@@ -156,6 +158,7 @@ if __name__ == "__main__":
         window.setWindowTitle("Client")
 
         appInterface = Interface(window, s)
+        appInterface.setStatus(True)
 
         thread = Thread(target=recv_file, args=(s,))
         thread.start()
