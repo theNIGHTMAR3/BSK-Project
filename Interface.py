@@ -1,10 +1,11 @@
 import os
 import sys
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
-    QMainWindow, QMessageBox, QFileDialog
+    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QApplication as qapp
-from wdc import encrypt, decrypt
+from wdc import encryptCFB, decryptCFB
+from wdc import encryptCBC, decryptCBC
 
 import tqdm as tqdm
 
@@ -19,20 +20,45 @@ class Interface:
         self.sendingFilename= ""
         self.keyStr = ""
         self.socket = socket
+        self.isCBC = True
+        self.isConnected = False
 
+        self.status = QLabel()
 
         self.widget = QWidget(mainWindow)
         flo = QFormLayout()
+
+        self.buttonGroup1 = QButtonGroup()
+        self.buttonGroup2 = QButtonGroup()
+
+
+        self.cbc = QRadioButton("CBC Mode")
+        self.cbc.setChecked(True)
+        self.cbc.toggled.connect(lambda: self.setIsCBC(self.cbc.isChecked()))
+        self.cfb = QRadioButton("CFB Mode")
+
+        self.buttonGroup1.addButton(self.cbc,1)
+        self.buttonGroup1.addButton(self.cfb,2)
+
+        layout1 = QVBoxLayout()
+        layout1.addWidget(self.cbc)
+        layout1.addWidget(self.cfb)
+
+
+        flo.addRow("Choose mode", layout1)
 
         self.encr = QRadioButton("Encrypt file")
         self.encr.setChecked(True)
         self.encr.toggled.connect(lambda: self.setIsEncrypt(self.encr.isChecked()))
         self.decr = QRadioButton("Decrypt file")
-        layout = QVBoxLayout()
-        layout.addWidget(self.encr)
-        layout.addWidget(self.decr)
 
-        flo.addRow("Choose action", layout)
+        self.buttonGroup2.addButton(self.encr, 1)
+        self.buttonGroup2.addButton(self.decr, 2)
+        layout2 = QVBoxLayout()
+        layout2.addWidget(self.encr)
+        layout2.addWidget(self.decr)
+
+        flo.addRow("Choose action", layout2)
 
         self.inputFile = QPushButton("Choose input file")
         self.inputFile.clicked.connect(lambda: self.setInputFilename())
@@ -83,15 +109,22 @@ class Interface:
         if self.keyStr != "" and self.inputFilename != "" and self.outputFilename != "":
             success = False
             if self.isEncrypt:
-                encrypt(self.inputFilename, self.outputFilename, self.keyStr)
+                if self.isCBC:
+                    encryptCBC(self.inputFilename, self.outputFilename, self.keyStr)
+                else:
+                    encryptCFB(self.inputFilename, self.outputFilename, self.keyStr)
                 success = True
             else:
                 try:
-                    decrypt(self.inputFilename, self.outputFilename, self.keyStr)
+                    if self.isCBC:
+                        decryptCBC(self.inputFilename, self.outputFilename, self.keyStr)
+                    else:
+                        decryptCFB(self.inputFilename, self.outputFilename, self.keyStr)
                     success = True
-                except:
+                except Exception as e:
                     self.showFailDialog("Error", "Generic error")
-            if(success):
+                    print(e)
+            if success:
                 self.showSuccessDialog("Enrypting" if self.isEncrypt else "Decrypting")
             self.clearForm()
         else:
@@ -164,6 +197,14 @@ class Interface:
         self.outputFile.setText(self.outputFilename) if self.outputFilename != "" else self.outputFile.setText("Choose output file")
         self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText("Choose input file")
 
+    def setIsCBC(self, isCBC):
+        self.isCBC = isCBC
+
+    #def setStatus(self):
+
+        if self.isConnected:
+            self.status.setText("CONNECTED")
+            self.status.setStyle()
 
 
     def showSuccessDialog(self, text):
@@ -198,18 +239,18 @@ class Interface:
         return fileName
 
 
-#if __name__ == "__main__":
+if __name__ == "__main__":
 
 
     #loader = QUiLoader()
     #app = qapp(sys.argv)
     #window = loader.load("testUI.ui", None)
 
-    # app = QApplication(sys.argv)
-    # app.setStyle('Fusion')
-    # window = QMainWindow()
-    # window.resize(300, 300)
-    # appInterface = Interface(window)
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    window = QMainWindow()
+    window.resize(300, 300)
+    appInterface = Interface(window, "socket")
 
 
-    # sys.exit(app.exec_())
+    sys.exit(app.exec_())

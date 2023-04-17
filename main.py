@@ -26,6 +26,7 @@ def recv_message(cs):
             cs.close()
             exit()
 
+
 def send_message(cs):
     while True:
         message = input("Enter the msg:")
@@ -33,37 +34,44 @@ def send_message(cs):
             return
         cs.send(bytes(message, 'utf-8'))
 
-def recvFile(cs):
-    received = cs.recv(BUFFER_SIZE).decode()
 
-    filename, filesize = received.split(SEPARATOR)
-    # remove absolute path if there is
-    filename = os.path.basename(filename)
-    # convert to integer
-    filesize = int(filesize)
+def recv_file(cs):
+    while True:
+        received = cs.recv(BUFFER_SIZE).decode()
 
-    progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-    with open(filename, "wb") as f:
-        while True:
-            print("while")
-            # read 1024 bytes from the socket (receive)
-            bytes_read = cs.recv(BUFFER_SIZE)
-            print("recv")
-            if not bytes_read:
+        filename, filesize = received.split(SEPARATOR)
+        # remove absolute path if there is
+        filename = os.path.basename(filename)
+        # convert to integer
+        filesize = int(filesize)
+        print(cs.gettimeout())
+        cs.settimeout(2)
+        progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+        with open(filename, "wb") as f:
+            while True:
+                try:
+                    # read 1024 bytes from the socket (receive)
+                    bytes_read = cs.recv(BUFFER_SIZE)
+                except socket.timeout as e:
+                    print(e)
+                    break
+                print("recv")
+                if not bytes_read:
 
-                print("not bytes")
-                # nothing is received
-                # file transmitting is done
-                break
-            # write to the file the bytes we just received
-            f.write(bytes_read)
-            print(bytes_read)
-            # update the progress bar
-            progress.update(len(bytes_read))
-            print(len(bytes_read))
-            # if len(bytes_read)<1024:
-            #     print("break")
-            #     break
+                    print("not bytes")
+                    # nothing is received
+                    # file transmitting is done
+                    break
+                # write to the file the bytes we just received
+                f.write(bytes_read)
+                print(bytes_read)
+                # update the progress bar
+                progress.update(len(bytes_read))
+                print(len(bytes_read))
+                # if len(bytes_read)<1024:
+                #     print("break")
+                #     break
+        cs.settimeout(None)
 
 
 def sendFile(cs, filename):
@@ -122,7 +130,7 @@ if __name__ == "__main__":
 
         appInterface = Interface(window, c)
 
-        thread = Thread(target=recvFile, args=(c, ))
+        thread = Thread(target=recv_file, args=(c, ))
         thread.start()
 
         window.setWindowTitle("Server")
@@ -149,7 +157,7 @@ if __name__ == "__main__":
 
         appInterface = Interface(window, s)
 
-        thread = Thread(target=recvFile, args=(s,))
+        thread = Thread(target=recv_file, args=(s,))
         thread.start()
 
 
