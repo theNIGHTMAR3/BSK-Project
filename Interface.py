@@ -2,8 +2,6 @@ import os
 import sys
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
     QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup
-from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QApplication as qapp
 from wdc import encryptCFB, decryptCFB
 from wdc import encryptCBC, decryptCBC
 
@@ -12,7 +10,11 @@ import tqdm as tqdm
 SEPARATOR = "<SEPARATOR>"
 BUFFER_SIZE = 1024
 
+
 class Interface:
+
+
+
     def __init__(self, mainWindow, socket):
         self.isEncrypt = True
         self.inputFilename = ""
@@ -99,8 +101,9 @@ class Interface:
         mainWindow.setCentralWidget(self.widget)
         mainWindow.show()
 
-    def setSocket(self,socket):
-        self.socket=socket
+    def setSocket(self, socket):
+        self.socket = socket
+
     def clearForm(self):
         self.inputFile.setText("Choose input file")
         self.inputFilename = ""
@@ -156,7 +159,6 @@ class Interface:
                 # update the progress bar
                 progress.update(len(bytes_read))
 
-
     def setInputFilename(self):
         filter = None
         if not self.isEncrypt:
@@ -199,22 +201,22 @@ class Interface:
         tmp = self.inputFilename
         self.inputFilename = self.outputFilename
         self.outputFilename = tmp
-        self.outputFile.setText(self.outputFilename) if self.outputFilename != "" else self.outputFile.setText("Choose output file")
-        self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText("Choose input file")
+        self.outputFile.setText(self.outputFilename) if self.outputFilename != "" else self.outputFile.setText(
+            "Choose output file")
+        self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText(
+            "Choose input file")
 
     def setIsCBC(self, isCBC):
         self.isCBC = isCBC
 
-    def setStatus(self,status : bool):
-        self.isConnected=status
+    def setStatus(self, status: bool):
+        self.isConnected = status
         if self.isConnected:
             self.status.setText("CONNECTED")
             self.status.setStyleSheet("color : green")
         else:
             self.status.setText("DISCONNECTED")
             self.status.setStyleSheet("color : red")
-
-
 
     def showSuccessDialog(self, text):
         msg = QMessageBox()
@@ -249,17 +251,14 @@ class Interface:
 
 
 if __name__ == "__main__":
-
-
-    #loader = QUiLoader()
-    #app = qapp(sys.argv)
-    #window = loader.load("testUI.ui", None)
+    # loader = QUiLoader()
+    # app = qapp(sys.argv)
+    # window = loader.load("testUI.ui", None)
 
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     window = QMainWindow()
     window.resize(300, 300)
     appInterface = Interface(window, "socket")
-
 
     sys.exit(app.exec_())

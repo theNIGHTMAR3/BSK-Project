@@ -57,7 +57,6 @@ def recv_file(cs):
                     break
                 print("recv")
                 if not bytes_read:
-
                     print("not bytes")
                     # nothing is received
                     # file transmitting is done
@@ -86,7 +85,7 @@ def sendFile(cs, filename):
             if not bytes_read:
                 # file transmitting is done
                 break
-            # we use sendall to assure transimission in
+            # we use sendall to assure transmission in
             # busy networks
             cs.sendall(bytes_read)
             # update the progress bar
@@ -100,27 +99,20 @@ if __name__ == "__main__":
     window = QMainWindow()
     window.resize(300, 300)
 
-    mode=''
+    #appInterface = Interface(window)
+    #appInterface.setStatus(False)
+
+    mode = ''
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s","--server", help="run program as server")
-    parser.add_argument("-c","--client", help="run program as client")
+    parser.add_argument("-s", "--server", help="run program as server")
+    parser.add_argument("-c", "--client", help="run program as client")
 
     args = parser.parse_args()
 
     if args.server:
-        mode ="server"
+        # SERVER Mode
         print("server mode")
-    elif args.client:
-        mode = "client"
-        print("client mode")
-    else:
-        print("select a mode to run application")
-        quit()
-
-
-    # SERVER Mode
-    if mode=="server":
-
+        window.setWindowTitle("Server")
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('localhost', 2137))
@@ -130,13 +122,17 @@ if __name__ == "__main__":
         print("Connected with ", addr)
         s.settimeout(2)
 
+
         appInterface = Interface(window, c)
         appInterface.setStatus(True)
 
-        thread = Thread(target=recv_file, args=(c, ))
+        #appInterface.setSocket(c)
+        #appInterface.setStatus(True)
+
+        thread = Thread(target=recv_file, args=(c,))
         thread.start()
 
-        window.setWindowTitle("Server")
+
 
         app.exec_()
 
@@ -148,21 +144,25 @@ if __name__ == "__main__":
         print("2")
 
 
-    # CLIENT Mode
-    if mode == "client":
+
+    elif args.client:
+        # CLIENT Mode
+        print("client mode")
         s = socket.socket()
 
         port = 2137
         s.connect(('localhost', port))
 
-        window.setWindowTitle("Client")
+
 
         appInterface = Interface(window, s)
         appInterface.setStatus(True)
 
+        #appInterface.setSocket(s)
+        #appInterface.setStatus(True)
+
         thread = Thread(target=recv_file, args=(s,))
         thread.start()
-
 
         # send_message(s)
 
@@ -171,6 +171,14 @@ if __name__ == "__main__":
         s.close()
         thread.join()
         print("2")
+
+    else:
+        print("select a mode to run application")
+        quit()
+
     exit()
+
+
+
 
 
