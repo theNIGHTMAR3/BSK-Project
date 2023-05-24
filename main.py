@@ -11,6 +11,7 @@ import sys
 
 SEPARATOR = "<SEPARATOR>"
 BUFFER_SIZE = 1024
+mode=''
 
 
 def recv_message(cs):
@@ -42,9 +43,9 @@ def recv_file(cs):
         filename, filesize = received.split(SEPARATOR)
         # remove absolute path if there is
         filename = os.path.basename(filename)
+        filename = mode + "Data/"+filename
         # convert to integer
         filesize = int(filesize)
-        print(cs.gettimeout())
         cs.settimeout(2)
         progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         with open(filename, "wb") as f:
@@ -55,7 +56,6 @@ def recv_file(cs):
                 except socket.timeout as e:
                     print(e)
                     break
-                print("recv")
                 if not bytes_read:
                     print("not bytes")
                     # nothing is received
@@ -63,10 +63,8 @@ def recv_file(cs):
                     break
                 # write to the file the bytes we just received
                 f.write(bytes_read)
-                print(bytes_read)
                 # update the progress bar
                 progress.update(len(bytes_read))
-                print(len(bytes_read))
                 # if len(bytes_read)<1024:
                 #     print("break")
                 #     break
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     #appInterface = Interface(window)
     #appInterface.setStatus(False)
 
-    mode = ''
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--server", help="run program as server")
     parser.add_argument("-c", "--client", help="run program as client")
@@ -112,6 +110,7 @@ if __name__ == "__main__":
     if args.server:
         # SERVER Mode
         print("server mode")
+        mode="Server"
         window.setWindowTitle("Server")
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -125,6 +124,7 @@ if __name__ == "__main__":
 
         appInterface = Interface(window, c)
         appInterface.setStatus(True)
+        appInterface.mode = "Server"
 
         #appInterface.setSocket(c)
         #appInterface.setStatus(True)
@@ -148,6 +148,8 @@ if __name__ == "__main__":
     elif args.client:
         # CLIENT Mode
         print("client mode")
+        mode = "Client"
+        window.setWindowTitle("Client")
         s = socket.socket()
 
         port = 2137
@@ -157,6 +159,7 @@ if __name__ == "__main__":
 
         appInterface = Interface(window, s)
         appInterface.setStatus(True)
+        appInterface.mode = "Client"
 
         #appInterface.setSocket(s)
         #appInterface.setStatus(True)

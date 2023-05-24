@@ -8,8 +8,6 @@ import getopt
 import sys
 
 
-
-
 def encryptCFB(inputFile, outputFile, key):
     with open(key, "r") as kk:
         key = RSA.import_key(kk.read())
@@ -74,32 +72,3 @@ def decryptCBC(inputFile, outputFile, key):
     data = unpad(c.decrypt(data), AES.block_size)
     with open(outputFile, "wb") as f:
         f.write(data)
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    inputFile = ''
-    outputFile = ''
-    key = ''
-    mode = ''
-    opts, args = getopt.getopt(sys.argv[1:], "edi:o:k:", ["encrypt", "decrypt", "input=", "output=", "key="])
-    for opt, arg in opts:
-        if opt in ("-o", "--output"):
-            outputFile = arg
-        if opt in ("-i", "--input"):
-            inputFile = arg
-        if opt in ("-k", "--key"):
-            key = arg
-        if opt in ("-e", "--encrypt"):
-            mode = "e"
-        if opt in ("-d", "--decrypt"):
-            mode = "d"
-    if mode == "e":
-        encrypt(inputFile, outputFile, key)
-
-    if mode == "d":
-        decrypt(inputFile, outputFile, key)
