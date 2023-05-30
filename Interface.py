@@ -1,10 +1,10 @@
 import os
 import sys
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
-    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar
+    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog
 from PyQt5 import QtCore
 from wdc import encryptCFB, decryptCFB
-from wdc import encryptCBC, decryptCBC
+from wdc import encryptCBC, decryptCBC, encrypt_key, decrypt_key
 from Crypto.PublicKey import RSA
 
 import tqdm as tqdm
@@ -19,8 +19,9 @@ class Interface:
         self.isEncrypt = True
         self.inputFilename = ""
         self.outputFilename = ""
-        self.sendingFilename= ""
-        self.keyStr = ""
+        self.sendingFilename = ""
+        self.keyPath = ""
+        self.keyInMemory = ""
         self.socket = socket
         self.isCBC = True
         self.isConnected = False
@@ -111,27 +112,26 @@ class Interface:
         self.inputFilename = ""
         self.outputFilename = ""
         self.key.setText("Choose key file")
-        self.sendingFilename=""
-        self.fileToSend=""
-        self.keyStr = ""
-        self.encr.setChecked(True)
+        self.sendingFilename = ""
+        self.keyPath = ""
+        self.keyInMemory = ""
         self.progress.reset()
 
     def performAction(self):
-        if self.keyStr != "" and self.inputFilename != "" and self.outputFilename != "":
+        if self.keyPath != "" and self.inputFilename != "" and self.outputFilename != "":
             success = False
             if self.isEncrypt:
                 if self.isCBC:
-                    encryptCBC(self.inputFilename, self.outputFilename, self.keyStr)
+                    encryptCBC(self.inputFilename, self.outputFilename, self.keyInMemory)
                 else:
-                    encryptCFB(self.inputFilename, self.outputFilename, self.keyStr)
+                    encryptCFB(self.inputFilename, self.outputFilename, self.keyInMemory)
                 success = True
             else:
                 try:
                     if self.isCBC:
-                        decryptCBC(self.inputFilename, self.outputFilename, self.keyStr)
+                        decryptCBC(self.inputFilename, self.outputFilename, self.keyInMemory)
                     else:
-                        decryptCFB(self.inputFilename, self.outputFilename, self.keyStr)
+                        decryptCFB(self.inputFilename, self.outputFilename, self.keyInMemory)
                     success = True
                 except Exception as e:
                     self.showFailDialog("Error", "Generic error")
@@ -182,8 +182,6 @@ class Interface:
         self.showSuccessDialog("Sending")
         self.clearForm()
 
-
-
     def setInputFilename(self):
         filter = None
         prename = self.mode+"Data/"
@@ -198,48 +196,68 @@ class Interface:
         if self.inputFilename != "":
             self.inputFile.setText(self.inputFilename)
 
-
     def setFileToSend(self):
+        print("setFileToSend")
         filter = None
-        if not self.isEncrypt:
-            filter = "(*.enc)"
         tmp = self.showFileDialog(filter)
         if tmp != "":
             self.sendingFilename = tmp
         if self.sendingFilename != "":
-            self.fileToSend.setText(self.sendingFilename)
+            print("beforeset")
+            try:
+                self.fileToSend.setText(self.sendingFilename)
+            except Exception as e:
+                self.showFailDialog("Error", "Generic error")
+                print(e)
+            print("afterset")
 
     def setKey(self):
         tmp = self.showFileDialog("PEM Files (*.pem)")
         if tmp != "":
-            self.keyStr = tmp
-        if self.keyStr != "":
-            self.key.setText(self.keyStr)
+            self.keyPath = tmp
+        if self.keyPath != "":
+            if self.isEncrypt:
+                with open(self.keyPath, "r") as kk:
+                    self.keyInMemory = kk.read()
+            else:
+                password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
+                if not done1:
+                    return
+                try:
+                    self.keyInMemory = decrypt_key(self.keyPath, password)
+                except Exception as e:
+                    self.showFailDialog("Error", "Wrong password")
+                    print(e)
+                    return
+            self.key.setText(self.keyPath)
 
     def generateKeys(self):
+        print("generateKeys")
         key = RSA.generate(2048)
         private_key = key.export_key()
         public_key = key.publickey().export_key()
 
         path = self.mode+"Data/"
+        password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
+        if not done1:
+            return
+        encrypt_key(private_key, path + self.mode + "_private.pem", password)
+        print("after enc")
 
-        f1=open(path+"private.pem","w")
-        f1.write(private_key.decode())
-        f1.close()
-
-        f2 = open(path + "public.pem", "w")
+        f2 = open(path + self.mode + "_public.pem", "w")
         f2.write(public_key.decode())
         f2.close()
 
     def setIsEncrypt(self, isEncrypt):
         self.isEncrypt = isEncrypt
-        tmp = self.inputFilename
-        self.inputFilename = self.outputFilename
-        self.outputFilename = tmp
+        self.clearForm()
+        # tmp = self.inputFilename
+        # self.inputFilename = self.outputFilename
+        # self.outputFilename = tmp
         # self.outputFile.setText(self.outputFilename) if self.outputFilename != "" else self.outputFile.setText(
         #     "Choose output file")
-        self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText(
-            "Choose input file")
+        # self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText(
+        #     "Choose input file")
 
     def setIsCBC(self, isCBC):
         self.isCBC = isCBC
@@ -287,17 +305,3 @@ class Interface:
             fileName = dialog.selectedFiles()
             return fileName[0]
         return fileName
-
-
-if __name__ == "__main__":
-    # loader = QUiLoader()
-    # app = qapp(sys.argv)
-    # window = loader.load("testUI.ui", None)
-
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    window = QMainWindow()
-    window.resize(300, 300)
-    appInterface = Interface(window, "socket")
-
-    sys.exit(app.exec_())
