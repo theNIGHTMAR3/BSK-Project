@@ -43,8 +43,8 @@ class Interface:
         self.cbc.toggled.connect(lambda: self.setIsCBC(self.cbc.isChecked()))
         self.cfb = QRadioButton("CFB Mode")
 
-        self.buttonGroup1.addButton(self.cbc,1)
-        self.buttonGroup1.addButton(self.cfb,2)
+        self.buttonGroup1.addButton(self.cbc, 1)
+        self.buttonGroup1.addButton(self.cfb, 2)
 
         layout1 = QVBoxLayout()
         layout1.addWidget(self.cbc)
@@ -187,7 +187,7 @@ class Interface:
         prename = self.mode+"Data/"
         if not self.isEncrypt:
             filter = "(*.enc)"
-            self.outputFilename = prename + "decrypted.txt"
+            self.outputFilename = prename
         else:
             self.outputFilename = prename + "encrypted.enc"
         tmp = self.showFileDialog(filter)
@@ -197,19 +197,16 @@ class Interface:
             self.inputFile.setText(self.inputFilename)
 
     def setFileToSend(self):
-        print("setFileToSend")
         filter = None
         tmp = self.showFileDialog(filter)
         if tmp != "":
             self.sendingFilename = tmp
         if self.sendingFilename != "":
-            print("beforeset")
             try:
                 self.fileToSend.setText(self.sendingFilename)
             except Exception as e:
                 self.showFailDialog("Error", "Generic error")
                 print(e)
-            print("afterset")
 
     def setKey(self):
         tmp = self.showFileDialog("PEM Files (*.pem)")
