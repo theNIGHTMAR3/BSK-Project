@@ -1,9 +1,6 @@
 import argparse
-import os
 import socket
-from threading import Thread
 
-import tqdm as tqdm
 
 from Interface import Interface
 from PyQt5.QtWidgets import QApplication, QMainWindow
@@ -11,102 +8,7 @@ import sys
 
 SEPARATOR = "<SEPARATOR>"
 BUFFER_SIZE = 1024
-mode=''
-
-
-def recv_message(cs):
-    print("Listening for messages")
-    while True:
-        try:
-            data = cs.recv(BUFFER_SIZE)
-            if not data:
-                continue
-            print("\nReceived Message:", data.decode())
-        except:
-            print("\nConnection error")
-            cs.close()
-            exit()
-
-
-def send_message(cs):
-    while True:
-        message = input("Enter the msg:")
-        if message == "quit":
-            return
-        cs.send(bytes(message, 'utf-8'))
-
-
-def recv_file(cs):
-    print("Listening for files")
-    while True:
-        received = cs.recv(BUFFER_SIZE).decode()
-
-        filename, filesize = received.split(SEPARATOR)
-        # remove absolute path if there is
-        filename = os.path.basename(filename)
-        filename = mode + "Data/"+filename
-        # convert to integer
-        filesize = int(filesize)
-        cs.settimeout(2)
-        progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        with open(filename, "wb") as f:
-            while True:
-                try:
-                    # read 1024 bytes from the socket (receive)
-                    bytes_read = cs.recv(BUFFER_SIZE)
-                except socket.timeout as e:
-                    print(e)
-                    break
-                if not bytes_read:
-                    print("not bytes")
-                    # nothing is received
-                    # file transmitting is done
-                    break
-                # write to the file the bytes we just received
-                f.write(bytes_read)
-                # update the progress bar
-                progress.update(len(bytes_read))
-                # if len(bytes_read)<1024:
-                #     print("break")
-                #     break
-        cs.settimeout(None)
-
-# def recv_message(cs):
-#     while True:
-#         received = cs.recv(BUFFER_SIZE).decode()
-#
-#         filename, filesize = received.split(SEPARATOR)
-#         # remove absolute path if there is
-#         filename = os.path.basename(filename)
-#         filename = mode + "Data/"+filename
-#         # convert to integer
-#         filesize = int(filesize)
-#         cs.settimeout(2)
-#         progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-#         with open(filename, "wb") as f:
-#             while True:
-#                 try:
-#                     # read 1024 bytes from the socket (receive)
-#                     bytes_read = cs.recv(BUFFER_SIZE)
-#                 except socket.timeout as e:
-#                     print(e)
-#                     break
-#                 if not bytes_read:
-#                     print("not bytes")
-#                     # nothing is received
-#                     # file transmitting is done
-#                     break
-#                 # write to the file the bytes we just received
-#                 f.write(bytes_read)
-#                 # update the progress bar
-#                 progress.update(len(bytes_read))
-#                 # if len(bytes_read)<1024:
-#                 #     print("break")
-#                 #     break
-#         cs.settimeout(None)
-
-
-
+mode = ''
 
 if __name__ == "__main__":
 
@@ -114,10 +16,6 @@ if __name__ == "__main__":
     app.setStyle('Fusion')
     window = QMainWindow()
     window.resize(300, 300)
-
-    #appInterface = Interface(window)
-    #appInterface.setStatus(False)
-
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--server", help="run program as server")
@@ -128,84 +26,61 @@ if __name__ == "__main__":
     if args.server:
         # SERVER Mode
         print("server mode")
-        mode="Server"
         window.setWindowTitle("Server")
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('localhost', 2137))
-        s.listen(3)
+        files_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        chat_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        files_socket.bind(('localhost', 9000))
+        chat_socket.bind(('localhost', 9001))
+
+        files_socket.listen(3)
+        chat_socket.listen(3)
+
         print("Listening on port")
-        c, addr = s.accept()
-        print("Connected with ", addr)
-        s.settimeout(2)
+        client_files_socket, addr1 = files_socket.accept()
+        client_chat_socket, addr2 = chat_socket.accept()
 
+        print("Connected with ", addr1)
+        print("Connected with ", addr2)
 
-        appInterface = Interface(window, c)
+        files_socket.settimeout(2)
+        chat_socket.settimeout(2)
+
+        appInterface = Interface(window, client_files_socket, client_chat_socket)
         appInterface.setStatus(True)
         appInterface.mode = "Server"
 
-        #appInterface.setSocket(c)
-        #appInterface.setStatus(True)
-
-        # thread1 = Thread(target=recv_file, args=(c,))
-        # thread1.start()
-
-        # thread2 = Thread(target=recv_message, args=(c,))
-        # thread2.start()
-
-
-
-
-
         app.exec_()
 
-        # send_message(c)
-        print("1")
-
-        c.close()
-        #thread.join()
-        print("2")
-
+        client_files_socket.close()
+        client_chat_socket.close()
 
 
     elif args.client:
         # CLIENT Mode
-        print("client mode")
-        mode = "Client"
+        print("Client mode")
         window.setWindowTitle("Client")
-        s = socket.socket()
+        files_socket = socket.socket()
+        chat_socket = socket.socket()
 
-        port = 2137
-        s.connect(('localhost', port))
+        files_socket.connect(('localhost', 9000))
+        chat_socket.connect(('localhost', 9001))
 
-
-
-        appInterface = Interface(window, s)
+        appInterface = Interface(window, files_socket, chat_socket)
         appInterface.setStatus(True)
         appInterface.mode = "Client"
 
-        #appInterface.setSocket(s)
-        #appInterface.setStatus(True)
-
-        # thread1 = Thread(target=recv_file, args=(s,))
-        # thread1.start()
-
-        # thread2 = Thread(target=recv_message, args=(s,))
-        # thread2.start()
-
-        # send_message(s)
-
         app.exec_()
-        print("1")
-        s.close()
-        #thread.join()
-        print("2")
+
+        files_socket.close()
+        chat_socket.close()
 
     else:
         print("select a mode to run application")
         quit()
 
-    exit()
+    sys.exit()
 
 
 

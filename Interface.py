@@ -2,6 +2,7 @@ import os
 import sys
 import datetime
 from threading import Thread
+import multiprocessing as mp
 
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
     QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog, QTextEdit
@@ -18,7 +19,7 @@ BUFFER_SIZE = 1024
 
 class Interface:
 
-    def __init__(self, mainWindow, socket):
+    def __init__(self, mainWindow, files_socket, chat_socket):
         self.isEncrypt = True
         self.inputFilename = ""
         self.outputFilename = ""
@@ -29,7 +30,8 @@ class Interface:
         self.publicKeyInMemory = ""
         self.privateKeyInMemory = ""
 
-        self.socket = socket
+        self.files_socket = files_socket
+        self.chat_socket = chat_socket
         self.isCBC = True
         self.isConnected = False
         self.mode = None
@@ -80,10 +82,6 @@ class Interface:
         self.keyGenerator = QPushButton("Generate public and private keys")
         self.keyGenerator.clicked.connect(lambda: self.generateKeys())
 
-        # self.key = QPushButton("Choose key file")
-        # self.key.clicked.connect(lambda: self.setKey())
-
-
         self.publicKey = QPushButton("Choose public key file")
         self.publicKey.clicked.connect(lambda: self.setPublicKey())
 
@@ -115,9 +113,9 @@ class Interface:
         self.fileToSend.clicked.connect(lambda: self.setFileToSend())
         flo.addRow("File to send:", self.fileToSend)
 
-        sendFileButton = QPushButton("Send File")
-        sendFileButton.clicked.connect(lambda: self.sendFile(self.sendingFilename))
-        flo.addRow("", sendFileButton)
+        self.sendFileButton = QPushButton("Send File")
+        self.sendFileButton.clicked.connect(lambda: self.sendFile(self.sendingFilename))
+        flo.addRow("", self.sendFileButton)
 
         self.progress = QProgressBar()
         self.progress.setAlignment(QtCore.Qt.AlignCenter)
@@ -127,26 +125,19 @@ class Interface:
         mainWindow.setCentralWidget(self.widget)
         mainWindow.show()
 
+        thread1 = Thread(target=self.receive_file)
         thread2 = Thread(target=self.receive_message)
-        thread2.start()
 
-    def setSocket(self, socket):
-        self.socket = socket
+        thread1.start()
+        thread2.start()
 
     def clearForm(self):
         self.inputFile.setText("Choose input file")
         self.inputFilename = ""
         self.outputFilename = ""
-        # self.key.setText("Choose key file")
-        # self.publicKey.setText("Choose public key file")
-        # self.privateKey.setText("Choose private key file")
         self.sendingFilename = ""
-        # self.keyPath = ""
-        # self.publicKeyPath = ""
-        # self.privateKeyPath = ""
-        # self.keyInMemory = ""
-        # self.publicKeyInMemory = ""
-        # self.privateKeyInMemory = ""
+        self.fileToSend.setText("Choose file to send")
+        self.sendFileButton.setText("Send File")
         self.progress.reset()
         self.messageInput.setText("")
 
@@ -179,7 +170,7 @@ class Interface:
         if message != "" and self.publicKeyPath != "" and self.privateKeyPath != "":
             try:
                 encrypted_message = encrypt_message(message, self.publicKeyInMemory, self.isCBC)
-                self.socket.send(encrypted_message)
+                self.chat_socket.send(encrypted_message)
 
                 current_time = datetime.datetime.now()
                 str_date_time = current_time.strftime("%H:%M:%S")
@@ -200,7 +191,7 @@ class Interface:
         print("Listening for messages")
         while True:
             try:
-                received = self.socket.recv(BUFFER_SIZE)
+                received = self.chat_socket.recv(BUFFER_SIZE)
                 if not received:
                     continue
 
@@ -218,45 +209,112 @@ class Interface:
             except Exception as e:
                 print("\nConnection error")
                 print(e)
-                self.socket.close()
+                self.chat_socket.close()
                 exit()
 
     def sendFile(self, filename):
-        filesize = os.path.getsize(filename)
-        self.socket.send(f"{filename}{SEPARATOR}{filesize}".encode())
+        if filename != "":
+            filesize = os.path.getsize(filename)
+            self.files_socket.send(f"{filename}{SEPARATOR}{filesize}".encode())
 
-        progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        reduced_filesize = filesize
-        divider = 1
-        r = 0
+            progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+            reduced_filesize = filesize
+            divider = 1
+            r = 0
 
-        while reduced_filesize > 2_147_483_647:
-            divider *= 10
-            reduced_filesize = filesize/divider
+            while reduced_filesize > 2_147_483_647:
+                divider *= 10
+                reduced_filesize = filesize/divider
 
-        self.progress.setMaximum(int(reduced_filesize))
-        with open(filename, "rb") as f:
+            self.progress.setMaximum(int(reduced_filesize))
+            with open(filename, "rb") as f:
+                try:
+                    while True:
+                        # read the bytes from the file
+                        bytes_read = f.read(BUFFER_SIZE)
+                        if not bytes_read:
+                            # file transmitting is done
+                            break
+                        # we use sendall to assure transmission in busy networks
+                        self.files_socket.sendall(bytes_read)
+                        # update the progress bar
+                        r += 1
+                        self.progress.setValue(int((r * BUFFER_SIZE) / divider))
+                        progress.update(len(bytes_read))
+                except Exception as e:
+                    print(e)
+                    self.showFailDialog("Error", "Error during sending file")
+                    return
+            # Sending done
+            self.progress.setValue(self.progress.maximum())
+            self.showSuccessDialog("Sending complete")
+            self.clearForm()
+
+    def receive_file(self):
+        print("Listening for files")
+        while True:
             try:
+                received = self.files_socket.recv(BUFFER_SIZE).decode()
+            except Exception as e:
+                print(e)
+                self.setStatus(False)
+                break
 
+            filename, filesize = received.split(SEPARATOR)
+            # remove absolute path if there is
+            filename = os.path.basename(filename)
+            filename = self.mode + "Data/" + filename
+            # convert to integer
+            filesize = int(filesize)
+
+            reduced_filesize = filesize
+            divider = 1
+            r = 0
+
+            while reduced_filesize > 2_147_483_647:
+                divider *= 10
+                reduced_filesize = filesize / divider
+
+            success = False
+
+            self.files_socket.settimeout(2)
+            self.progress.setMaximum(int(reduced_filesize))
+
+            progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+            with open(filename, "wb") as f:
                 while True:
-                    # read the bytes from the file
-                    bytes_read = f.read(BUFFER_SIZE)
-                    if not bytes_read:
-                        # file transmitting is done
+                    try:
+                        # read 1024 bytes from the socket (receive)
+                        bytes_read = self.files_socket.recv(BUFFER_SIZE)
+                    except Exception as e:
+                        print(e)
+                        self.showFailDialog("Error", "Error during downloading the file")
                         break
-                    # we use sendall to assure transmission in busy networks
-                    self.socket.sendall(bytes_read)
+
+                    # nothing is received, downloading done
+                    if not bytes_read:
+                        success = True
+                        break
+
+                    f.write(bytes_read)
+
                     # update the progress bar
                     r += 1
                     self.progress.setValue(int((r * BUFFER_SIZE) / divider))
                     progress.update(len(bytes_read))
-            except Exception as e:
-                self.showFailDialog("Error", "Generic error")
-                print(e)
-        # Sending done
-        self.progress.setValue(self.progress.maximum())
-        self.showSuccessDialog("Sending")
-        self.clearForm()
+
+                    if len(bytes_read) < 1024:
+                        success = True
+                        break
+
+            self.files_socket.settimeout(None)
+
+            # Downloading done
+            if success:
+                self.progress.setValue(self.progress.maximum())
+                self.showSuccessDialog("Download complete")
+                self.clearForm()
+
 
     def setInputFilename(self):
         filter = None
@@ -283,26 +341,6 @@ class Interface:
             except Exception as e:
                 self.showFailDialog("Error", "Generic error")
                 print(e)
-
-    # def setKey(self):
-    #     tmp = self.showFileDialog("PEM Files (*.pem)")
-    #     if tmp != "":
-    #         self.keyPath = tmp
-    #     if self.keyPath != "":
-    #         if self.isEncrypt:
-    #             with open(self.keyPath, "r") as kk:
-    #                 self.keyInMemory = kk.read()
-    #         else:
-    #             password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
-    #             if not done1:
-    #                 return
-    #             try:
-    #                 self.keyInMemory = decrypt_key(self.keyPath, password)
-    #             except Exception as e:
-    #                 self.showFailDialog("Error", "Wrong password")
-    #                 print(e)
-    #                 return
-    #         self.key.setText(self.keyPath)
 
     def setPublicKey(self):
         tmp = self.showFileDialog("PEM Files (*.pem)")
@@ -371,15 +409,10 @@ class Interface:
             self.status.setText("DISCONNECTED")
             self.status.setStyleSheet("color : red")
 
-    # def setProgress(self, progress: str):
-    #     self.progress.setText(progress)
-    #     self.progress.setStyleSheet("color : red")
-
     @staticmethod
     def showSuccessDialog(text):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
-
         msg.setText("Action performed")
         msg.setInformativeText(text + " done")
         msg.setWindowTitle(text)
@@ -390,7 +423,6 @@ class Interface:
     def showFailDialog(text, InfoText):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Critical)
-
         msg.setText(text)
         msg.setInformativeText(InfoText)
         msg.setWindowTitle("Error")
