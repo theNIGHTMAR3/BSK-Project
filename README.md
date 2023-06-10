@@ -19,10 +19,9 @@ To run this application 2, instances must be started. It is recommended to use I
 - Decryption protected by a password set during the generation of keys
 - Sending and receiving files
 - Progress bar for sending files
+- Secure chat 
 
 #### TODO:
-- Secure chat implementation
-- Full progress bar functionality
+- progress bar functionality during encryption/decryption
 - Significant  GUI improvements
-- Improved bidirectional communication
 - Disconnection handling
