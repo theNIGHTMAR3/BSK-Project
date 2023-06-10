@@ -1,4 +1,5 @@
 import os
+import io
 
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
@@ -98,3 +99,61 @@ def decryptCBC(input_file, output_path, key):
     data = unpad(c.decrypt(data), AES.block_size)
     with open(output_path + filename, "wb") as f:
         f.write(data)
+
+def encrypt_message(message, key, isCBC):
+    key = RSA.import_key(key)
+
+    if isCBC == True:
+        k = get_random_bytes(16)
+        c = AES.new(k, AES.MODE_CBC)
+        c_data = c.encrypt(pad(bytes(message, 'utf-8'), AES.block_size))
+    else:
+        k = get_random_bytes(16)
+        c = AES.new(k, AES.MODE_CFB)
+        c_data = c.encrypt(bytes(message, 'utf-8'))
+
+    ck = PKCS1_OAEP.new(key)
+
+
+    filename = "message"
+    filename = bytes(filename, 'utf-8')
+    c_filename = ck.encrypt(filename)
+    c_k = ck.encrypt(k)
+    encrypted_message = len(c_filename).to_bytes(4, "little")
+    encrypted_message += c_filename
+    encrypted_message += len(c_k).to_bytes(4, "little")
+    encrypted_message += c_k
+    encrypted_message += c.iv
+    encrypted_message += c_data
+
+    return encrypted_message
+
+
+def decrypt_message(c_message, key, isCBC):
+    key = RSA.import_key(key)
+
+    bytes_message = io.BytesIO(c_message)
+
+    filename_size = bytes_message.read(4)
+    c_filename = bytes_message.read(int.from_bytes(filename_size, "little"))
+    size = bytes_message.read(4)
+    c_k = bytes_message.read(int.from_bytes(size, "little"))
+    iv = bytes_message.read(16)
+    data = bytes_message.read()
+
+    ck = PKCS1_OAEP.new(key)
+    filename = ck.decrypt(c_filename)
+    filename = filename.decode("utf-8")
+    k = ck.decrypt(c_k)
+
+    if isCBC == True:
+        c = AES.new(k, AES.MODE_CBC, iv=iv)
+        data = unpad(c.decrypt(data), AES.block_size)
+    else:
+        c = AES.new(k, AES.MODE_CFB, iv=iv)
+        data = c.decrypt(data)
+
+    return data.decode()
+
+
+

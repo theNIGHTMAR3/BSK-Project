@@ -1,10 +1,13 @@
 import os
 import sys
+import datetime
+from threading import Thread
+
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
-    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog
+    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog, QTextEdit
 from PyQt5 import QtCore
 from wdc import encryptCFB, decryptCFB
-from wdc import encryptCBC, decryptCBC, encrypt_key, decrypt_key
+from wdc import encryptCBC, decryptCBC, encrypt_key, decrypt_key, encrypt_message, decrypt_message
 from Crypto.PublicKey import RSA
 
 import tqdm as tqdm
@@ -20,13 +23,19 @@ class Interface:
         self.inputFilename = ""
         self.outputFilename = ""
         self.sendingFilename = ""
-        self.keyPath = ""
-        self.keyInMemory = ""
+
+        self.publicKeyPath = ""
+        self.privateKeyPath = ""
+        self.publicKeyInMemory = ""
+        self.privateKeyInMemory = ""
+
         self.socket = socket
         self.isCBC = True
         self.isConnected = False
         self.mode = None
         self.progress = ""
+        self.chat = ""
+        self.messageInput = ""
 
         self.widget = QWidget(mainWindow)
         flo = QFormLayout()
@@ -71,21 +80,35 @@ class Interface:
         self.keyGenerator = QPushButton("Generate public and private keys")
         self.keyGenerator.clicked.connect(lambda: self.generateKeys())
 
-        self.key = QPushButton("Choose key file")
-        self.key.clicked.connect(lambda: self.setKey())
+        # self.key = QPushButton("Choose key file")
+        # self.key.clicked.connect(lambda: self.setKey())
+
+
+        self.publicKey = QPushButton("Choose public key file")
+        self.publicKey.clicked.connect(lambda: self.setPublicKey())
+
+        self.privateKey = QPushButton("Choose private key file")
+        self.privateKey.clicked.connect(lambda: self.setPrivateKey())
 
         flo.addRow("Input filename:", self.inputFile)
         flo.addRow("Key Generator:", self.keyGenerator)
-        flo.addRow("Key:", self.key)
+        # flo.addRow("Key:", self.key)
+        flo.addRow("Public key:", self.publicKey)
+        flo.addRow("Private key:", self.privateKey)
 
         button = QPushButton("Perform action")
         button.clicked.connect(lambda: self.performAction())
         flo.addRow("", button)
 
-        message = QLineEdit()
+        self.chat = QTextEdit()
+        self.chat.setReadOnly(True)
         sendButton = QPushButton("Send message")
-        sendButton.clicked.connect(lambda: self.sendMessage(message.text()))
-        flo.addRow("", message)
+        self.messageInput = QLineEdit()
+
+        self.messageInput.returnPressed.connect(lambda: self.sendMessage(self.messageInput.text()))
+        sendButton.clicked.connect(lambda: self.sendMessage(self.messageInput.text()))
+        flo.addRow("", self.chat)
+        flo.addRow("", self.messageInput)
         flo.addRow("", sendButton)
 
         self.fileToSend = QPushButton("Choose file to send")
@@ -104,6 +127,9 @@ class Interface:
         mainWindow.setCentralWidget(self.widget)
         mainWindow.show()
 
+        thread2 = Thread(target=self.receive_message)
+        thread2.start()
+
     def setSocket(self, socket):
         self.socket = socket
 
@@ -111,39 +137,89 @@ class Interface:
         self.inputFile.setText("Choose input file")
         self.inputFilename = ""
         self.outputFilename = ""
-        self.key.setText("Choose key file")
+        # self.key.setText("Choose key file")
+        # self.publicKey.setText("Choose public key file")
+        # self.privateKey.setText("Choose private key file")
         self.sendingFilename = ""
-        self.keyPath = ""
-        self.keyInMemory = ""
+        # self.keyPath = ""
+        # self.publicKeyPath = ""
+        # self.privateKeyPath = ""
+        # self.keyInMemory = ""
+        # self.publicKeyInMemory = ""
+        # self.privateKeyInMemory = ""
         self.progress.reset()
+        self.messageInput.setText("")
 
     def performAction(self):
-        if self.keyPath != "" and self.inputFilename != "" and self.outputFilename != "":
+        if self.publicKeyPath != "" and self.privateKeyPath != "" and self.inputFilename != "" and self.outputFilename != "":
             success = False
             if self.isEncrypt:
                 if self.isCBC:
-                    encryptCBC(self.inputFilename, self.outputFilename, self.keyInMemory)
+                    encryptCBC(self.inputFilename, self.outputFilename, self.publicKeyInMemory)
                 else:
-                    encryptCFB(self.inputFilename, self.outputFilename, self.keyInMemory)
+                    encryptCFB(self.inputFilename, self.outputFilename, self.publicKeyInMemory)
                 success = True
             else:
                 try:
                     if self.isCBC:
-                        decryptCBC(self.inputFilename, self.outputFilename, self.keyInMemory)
+                        decryptCBC(self.inputFilename, self.outputFilename, self.privateKeyInMemory)
                     else:
-                        decryptCFB(self.inputFilename, self.outputFilename, self.keyInMemory)
+                        decryptCFB(self.inputFilename, self.outputFilename, self.privateKeyInMemory)
                     success = True
                 except Exception as e:
                     self.showFailDialog("Error", "Generic error")
                     print(e)
             if success:
-                self.showSuccessDialog("Enrypting" if self.isEncrypt else "Decrypting")
+                self.showSuccessDialog("Encrypting" if self.isEncrypt else "Decrypting")
             self.clearForm()
         else:
             self.showFailDialog("Wrong input", "All fields must be filled")
 
     def sendMessage(self, message):
-        self.socket.send(bytes(message, 'utf-8'))
+        if message != "" and self.publicKeyPath != "" and self.privateKeyPath != "":
+            try:
+                encrypted_message = encrypt_message(message, self.publicKeyInMemory, self.isCBC)
+                self.socket.send(encrypted_message)
+
+                current_time = datetime.datetime.now()
+                str_date_time = current_time.strftime("%H:%M:%S")
+
+                if self.chat.toPlainText() != "":
+                    self.chat.append('')
+                self.chat.append(str_date_time)
+                self.chat.append("You:\n" + message)
+                self.chat.ensureCursorVisible()
+                self.messageInput.clear()
+                print("Message sent")
+
+            except Exception as e:
+                self.showFailDialog("Error", "Error during sending message")
+                print(e)
+
+    def receive_message(self):
+        print("Listening for messages")
+        while True:
+            try:
+                received = self.socket.recv(BUFFER_SIZE)
+                if not received:
+                    continue
+
+                decrypted_message = decrypt_message(received, self.privateKeyInMemory, self.isCBC)
+                print("\nReceived Message:", decrypted_message)
+
+                current_time = datetime.datetime.now()
+                str_date_time = current_time.strftime("%H:%M:%S")
+
+                if self.chat.toPlainText() != "":
+                    self.chat.append('')
+                self.chat.append(str_date_time)
+                self.chat.append("Other:\n" + decrypted_message)
+                self.chat.ensureCursorVisible()
+            except Exception as e:
+                print("\nConnection error")
+                print(e)
+                self.socket.close()
+                exit()
 
     def sendFile(self, filename):
         filesize = os.path.getsize(filename)
@@ -152,7 +228,7 @@ class Interface:
         progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         reduced_filesize = filesize
         divider = 1
-        round = 0
+        r = 0
 
         while reduced_filesize > 2_147_483_647:
             divider *= 10
@@ -171,8 +247,8 @@ class Interface:
                     # we use sendall to assure transmission in busy networks
                     self.socket.sendall(bytes_read)
                     # update the progress bar
-                    round += 1
-                    self.progress.setValue(int((round * BUFFER_SIZE) / divider))
+                    r += 1
+                    self.progress.setValue(int((r * BUFFER_SIZE) / divider))
                     progress.update(len(bytes_read))
             except Exception as e:
                 self.showFailDialog("Error", "Generic error")
@@ -208,25 +284,52 @@ class Interface:
                 self.showFailDialog("Error", "Generic error")
                 print(e)
 
-    def setKey(self):
+    # def setKey(self):
+    #     tmp = self.showFileDialog("PEM Files (*.pem)")
+    #     if tmp != "":
+    #         self.keyPath = tmp
+    #     if self.keyPath != "":
+    #         if self.isEncrypt:
+    #             with open(self.keyPath, "r") as kk:
+    #                 self.keyInMemory = kk.read()
+    #         else:
+    #             password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
+    #             if not done1:
+    #                 return
+    #             try:
+    #                 self.keyInMemory = decrypt_key(self.keyPath, password)
+    #             except Exception as e:
+    #                 self.showFailDialog("Error", "Wrong password")
+    #                 print(e)
+    #                 return
+    #         self.key.setText(self.keyPath)
+
+    def setPublicKey(self):
         tmp = self.showFileDialog("PEM Files (*.pem)")
         if tmp != "":
-            self.keyPath = tmp
-        if self.keyPath != "":
-            if self.isEncrypt:
-                with open(self.keyPath, "r") as kk:
-                    self.keyInMemory = kk.read()
-            else:
-                password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
-                if not done1:
-                    return
-                try:
-                    self.keyInMemory = decrypt_key(self.keyPath, password)
-                except Exception as e:
-                    self.showFailDialog("Error", "Wrong password")
-                    print(e)
-                    return
-            self.key.setText(self.keyPath)
+            self.publicKeyPath = tmp
+        if self.publicKeyPath != "":
+            with open(self.publicKeyPath, "r") as kk:
+                self.publicKeyInMemory = kk.read()
+
+            self.publicKey.setText(self.publicKeyPath)
+
+    def setPrivateKey(self):
+        tmp = self.showFileDialog("PEM Files (*.pem)")
+        if tmp != "":
+            self.privateKeyPath = tmp
+        if self.privateKeyPath != "":
+            password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
+            if not done1:
+                return
+            try:
+                self.privateKeyInMemory = decrypt_key(self.privateKeyPath, password)
+            except Exception as e:
+                self.showFailDialog("Error", "Wrong password")
+                print(e)
+                return
+            self.privateKey.setText(self.privateKeyPath)
+
 
     def generateKeys(self):
         print("generateKeys")
@@ -272,7 +375,8 @@ class Interface:
     #     self.progress.setText(progress)
     #     self.progress.setStyleSheet("color : red")
 
-    def showSuccessDialog(self, text):
+    @staticmethod
+    def showSuccessDialog(text):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
 
@@ -282,7 +386,8 @@ class Interface:
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
 
-    def showFailDialog(self, text, InfoText):
+    @staticmethod
+    def showFailDialog(text, InfoText):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Critical)
 
@@ -292,11 +397,12 @@ class Interface:
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
 
-    def showFileDialog(self, filt=None):
+    @staticmethod
+    def showFileDialog(filter=None):
         dialog = QFileDialog()
         dialog.setFileMode(QFileDialog.AnyFile)
-        if filt is not None:
-            dialog.setNameFilter(filt)
+        if filter is not None:
+            dialog.setNameFilter(filter)
         fileName = ""
         if dialog.exec_():
             fileName = dialog.selectedFiles()

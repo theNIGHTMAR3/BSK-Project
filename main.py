@@ -15,8 +15,8 @@ mode=''
 
 
 def recv_message(cs):
+    print("Listening for messages")
     while True:
-        print("recv")
         try:
             data = cs.recv(BUFFER_SIZE)
             if not data:
@@ -37,6 +37,7 @@ def send_message(cs):
 
 
 def recv_file(cs):
+    print("Listening for files")
     while True:
         received = cs.recv(BUFFER_SIZE).decode()
 
@@ -70,24 +71,41 @@ def recv_file(cs):
                 #     break
         cs.settimeout(None)
 
-
-# def sendFile(cs, filename):
-#     filesize = os.path.getsize(filename)
-#     cs.send(f"{filename}{SEPARATOR}{filesize}".encode())
+# def recv_message(cs):
+#     while True:
+#         received = cs.recv(BUFFER_SIZE).decode()
 #
-#     progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-#     with open(filename, "rb") as f:
-#         while True:
-#             # read the bytes from the file
-#             bytes_read = f.read(BUFFER_SIZE)
-#             if not bytes_read:
-#                 # file transmitting is done
-#                 break
-#             # we use sendall to assure transmission in
-#             # busy networks
-#             cs.sendall(bytes_read)
-#             # update the progress bar
-#             progress.update(len(bytes_read))
+#         filename, filesize = received.split(SEPARATOR)
+#         # remove absolute path if there is
+#         filename = os.path.basename(filename)
+#         filename = mode + "Data/"+filename
+#         # convert to integer
+#         filesize = int(filesize)
+#         cs.settimeout(2)
+#         progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+#         with open(filename, "wb") as f:
+#             while True:
+#                 try:
+#                     # read 1024 bytes from the socket (receive)
+#                     bytes_read = cs.recv(BUFFER_SIZE)
+#                 except socket.timeout as e:
+#                     print(e)
+#                     break
+#                 if not bytes_read:
+#                     print("not bytes")
+#                     # nothing is received
+#                     # file transmitting is done
+#                     break
+#                 # write to the file the bytes we just received
+#                 f.write(bytes_read)
+#                 # update the progress bar
+#                 progress.update(len(bytes_read))
+#                 # if len(bytes_read)<1024:
+#                 #     print("break")
+#                 #     break
+#         cs.settimeout(None)
+
+
 
 
 if __name__ == "__main__":
@@ -129,8 +147,13 @@ if __name__ == "__main__":
         #appInterface.setSocket(c)
         #appInterface.setStatus(True)
 
-        thread = Thread(target=recv_file, args=(c,))
-        thread.start()
+        # thread1 = Thread(target=recv_file, args=(c,))
+        # thread1.start()
+
+        # thread2 = Thread(target=recv_message, args=(c,))
+        # thread2.start()
+
+
 
 
 
@@ -140,7 +163,7 @@ if __name__ == "__main__":
         print("1")
 
         c.close()
-        thread.join()
+        #thread.join()
         print("2")
 
 
@@ -164,15 +187,18 @@ if __name__ == "__main__":
         #appInterface.setSocket(s)
         #appInterface.setStatus(True)
 
-        thread = Thread(target=recv_file, args=(s,))
-        thread.start()
+        # thread1 = Thread(target=recv_file, args=(s,))
+        # thread1.start()
+
+        # thread2 = Thread(target=recv_message, args=(s,))
+        # thread2.start()
 
         # send_message(s)
 
         app.exec_()
         print("1")
         s.close()
-        thread.join()
+        #thread.join()
         print("2")
 
     else:
