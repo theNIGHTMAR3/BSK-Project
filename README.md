@@ -12,16 +12,18 @@ To run this application 2, instances must be started. It is recommended to use I
 2. To start the Client, run the program with this launch parameter: -c CLIENT
 
 #### Current features:
-- CLient-Server socket connection
+- Client-Server socket connection
 - Implementation of CBC and CFB algorithms
 - Encrypting and decrypting various files
 - RSA keys generation
 - Decryption protected by a password set during the generation of keys
 - Sending and receiving files
-- Progress bar for sending files
+- Progress bar for sending and receiving files
 - Secure chat 
+- Improved GUI
+- Bidirectional communication
+- Connection status display
 
 #### TODO:
-- progress bar functionality during encryption/decryption
-- Significant  GUI improvements
+- Progress bar functionality during encryption/decryption
 - Disconnection handling

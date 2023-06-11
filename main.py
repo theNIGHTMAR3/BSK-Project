@@ -46,9 +46,9 @@ if __name__ == "__main__":
         files_socket.settimeout(2)
         chat_socket.settimeout(2)
         try:
-            appInterface = Interface(window, client_files_socket, client_chat_socket)
-            appInterface.setStatus(True)
-            appInterface.mode = "Server"
+            app_interface = Interface(window, client_files_socket, client_chat_socket)
+            app_interface.set_status(True)
+            app_interface.mode = "Server"
         except Exception as e:
             print(e)
 
@@ -70,9 +70,9 @@ if __name__ == "__main__":
         files_socket.connect(('localhost', 9000))
         chat_socket.connect(('localhost', 9001))
         try:
-            appInterface = Interface(window, files_socket, chat_socket)
-            appInterface.setStatus(True)
-            appInterface.mode = "Client"
+            app_interface = Interface(window, files_socket, chat_socket)
+            app_interface.set_status(True)
+            app_interface.mode = "Client"
         except Exception as e:
             print(e)
 
