@@ -1,11 +1,10 @@
 import os
-import sys
 import datetime
 from threading import Thread
-import multiprocessing as mp
 
 from PyQt5.QtWidgets import QWidget, QFormLayout, QLineEdit, QRadioButton, QVBoxLayout, QPushButton, QApplication, \
-    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog, QTextEdit
+    QMainWindow, QMessageBox, QFileDialog, QLabel, QButtonGroup, QProgressBar, QInputDialog, QTextEdit, QSplitter, \
+    QHBoxLayout, QGroupBox
 from PyQt5 import QtCore
 from wdc import encryptCFB, decryptCFB
 from wdc import encryptCBC, decryptCBC, encrypt_key, decrypt_key, encrypt_message, decrypt_message
@@ -38,13 +37,46 @@ class Interface:
         self.progress = ""
         self.chat = ""
         self.messageInput = ""
-
         self.widget = QWidget(mainWindow)
-        flo = QFormLayout()
+
+        chat_widget = QWidget()
+        settings_actions_widget = QWidget()
+
+        # Chat layout
+        self.chat = QTextEdit()
+        self.chat.setReadOnly(True)
+        sendButton = QPushButton("Send message")
+        self.messageInput = QLineEdit()
+
+        self.messageInput.returnPressed.connect(lambda: self.sendMessage(self.messageInput.text()))
+        sendButton.clicked.connect(lambda: self.sendMessage(self.messageInput.text()))
+
+        input_and_button_widget = QWidget()
+        input_and_button = QHBoxLayout(input_and_button_widget)
+        input_and_button.addWidget(self.messageInput)
+        input_and_button.addWidget(sendButton)
+
+        chat_layout = QVBoxLayout(chat_widget)
+        chat_layout.addWidget(self.chat)
+        chat_layout.addWidget(input_and_button_widget)
+        chat_widget.setMinimumWidth(400)
+
+        # settings layout
+        settings_group = QGroupBox("Configuration")
+        settings_group.setStyleSheet("QGroupBox {"
+                                     "font-size: 20px; }"
+                                     "QGroupBox::title {"
+                                     "subcontrol-origin: margin;"
+                                     "subcontrol-position: top center;"
+                                     "padding: 10px;"
+                                     "font-size: 20px}")
+        settings_layout = QFormLayout(settings_group)
 
         self.status = QLabel()
-        flo.addRow("STATUS:", self.status)
+        settings_layout.addRow("STATUS:", self.status)
         self.setStatus(False)
+
+        settings_layout.addRow(QLabel(""), QWidget().setMinimumHeight(70))
 
         self.buttonGroup1 = QButtonGroup()
         self.buttonGroup2 = QButtonGroup()
@@ -53,31 +85,29 @@ class Interface:
         self.cbc.setChecked(True)
         self.cbc.toggled.connect(lambda: self.setIsCBC(self.cbc.isChecked()))
         self.cfb = QRadioButton("CFB Mode")
-
         self.buttonGroup1.addButton(self.cbc, 1)
         self.buttonGroup1.addButton(self.cfb, 2)
 
         layout1 = QVBoxLayout()
         layout1.addWidget(self.cbc)
         layout1.addWidget(self.cfb)
-
-        flo.addRow("Choose mode", layout1)
+        settings_layout.addRow("Choose mode", layout1)
 
         self.encr = QRadioButton("Encrypt file")
         self.encr.setChecked(True)
         self.encr.toggled.connect(lambda: self.setIsEncrypt(self.encr.isChecked()))
         self.decr = QRadioButton("Decrypt file")
-
         self.buttonGroup2.addButton(self.encr, 1)
         self.buttonGroup2.addButton(self.decr, 2)
         layout2 = QVBoxLayout()
         layout2.addWidget(self.encr)
         layout2.addWidget(self.decr)
 
-        flo.addRow("Choose action", layout2)
+        settings_layout.addRow("Choose action", layout2)
 
-        self.inputFile = QPushButton("Choose input file")
-        self.inputFile.clicked.connect(lambda: self.setInputFilename())
+        spacer2 = QWidget()
+        spacer2.setMinimumHeight(20)
+        settings_layout.addRow(spacer2)
 
         self.keyGenerator = QPushButton("Generate public and private keys")
         self.keyGenerator.clicked.connect(lambda: self.generateKeys())
@@ -88,40 +118,62 @@ class Interface:
         self.privateKey = QPushButton("Choose private key file")
         self.privateKey.clicked.connect(lambda: self.setPrivateKey())
 
-        flo.addRow("Input filename:", self.inputFile)
-        flo.addRow("Key Generator:", self.keyGenerator)
-        # flo.addRow("Key:", self.key)
-        flo.addRow("Public key:", self.publicKey)
-        flo.addRow("Private key:", self.privateKey)
+        settings_layout.addRow("Key Generator:", self.keyGenerator)
+        settings_layout.addRow("Public key:", self.publicKey)
+        settings_layout.addRow("Private key:", self.privateKey)
+
+        # actions layout
+        actions_group = QGroupBox("Actions")
+        actions_group.setStyleSheet("QGroupBox {"
+                                    "font-size: 20px;}"
+                                    "QGroupBox::title {"
+                                    "subcontrol-origin: margin;"
+                                    "subcontrol-position: top center;"
+                                    "padding: 10px;"
+                                    "font-size: 20px}")
+
+        actions_layout = QFormLayout(actions_group)
+
+        self.inputFile = QPushButton("Choose input file")
+        self.inputFile.clicked.connect(lambda: self.setInputFilename())
+
+        self.inputFile = QPushButton("Choose input file")
+        self.inputFile.clicked.connect(lambda: self.setInputFilename())
 
         button = QPushButton("Perform action")
         button.clicked.connect(lambda: self.performAction())
-        flo.addRow("", button)
 
-        self.chat = QTextEdit()
-        self.chat.setReadOnly(True)
-        sendButton = QPushButton("Send message")
-        self.messageInput = QLineEdit()
+        actions_layout.addRow("Input filename:", self.inputFile)
+        actions_layout.addRow("", button)
 
-        self.messageInput.returnPressed.connect(lambda: self.sendMessage(self.messageInput.text()))
-        sendButton.clicked.connect(lambda: self.sendMessage(self.messageInput.text()))
-        flo.addRow("", self.chat)
-        flo.addRow("", self.messageInput)
-        flo.addRow("", sendButton)
+        spacer3 = QWidget()
+        spacer3.setMinimumHeight(30)
+        actions_layout.addRow(spacer3)
 
         self.fileToSend = QPushButton("Choose file to send")
         self.fileToSend.clicked.connect(lambda: self.setFileToSend())
-        flo.addRow("File to send:", self.fileToSend)
-
         self.sendFileButton = QPushButton("Send File")
         self.sendFileButton.clicked.connect(lambda: self.sendFile(self.sendingFilename))
-        flo.addRow("", self.sendFileButton)
+
+        actions_layout.addRow("File to send:", self.fileToSend)
+        actions_layout.addRow("", self.sendFileButton)
+
+        spacer4 = QWidget()
+        spacer4.setMinimumHeight(60)
+        actions_layout.addRow(spacer4)
 
         self.progress = QProgressBar()
         self.progress.setAlignment(QtCore.Qt.AlignCenter)
-        flo.addRow("progress:", self.progress)
+        actions_layout.addRow("progress:", self.progress)
 
-        self.widget.setLayout(flo)
+        settings_actions = QVBoxLayout(settings_actions_widget)
+        settings_actions.addWidget(settings_group)
+        settings_actions.addWidget(actions_group)
+
+        other = QHBoxLayout(self.widget)
+        other.addWidget(chat_widget)
+        other.addWidget(settings_actions_widget)
+
         mainWindow.setCentralWidget(self.widget)
         mainWindow.show()
 
@@ -142,7 +194,8 @@ class Interface:
         self.messageInput.setText("")
 
     def performAction(self):
-        if self.publicKeyPath != "" and self.privateKeyPath != "" and self.inputFilename != "" and self.outputFilename != "":
+        if self.publicKeyPath != "" and self.privateKeyPath != "" and self.inputFilename != "" and \
+                self.outputFilename != "":
             success = False
             if self.isEncrypt:
                 if self.isCBC:
@@ -222,9 +275,10 @@ class Interface:
             divider = 1
             r = 0
 
+            # larger then int
             while reduced_filesize > 2_147_483_647:
                 divider *= 10
-                reduced_filesize = filesize/divider
+                reduced_filesize = filesize / divider
 
             self.progress.setMaximum(int(reduced_filesize))
             with open(filename, "rb") as f:
@@ -271,6 +325,7 @@ class Interface:
             divider = 1
             r = 0
 
+            # larger then int
             while reduced_filesize > 2_147_483_647:
                 divider *= 10
                 reduced_filesize = filesize / divider
@@ -303,7 +358,7 @@ class Interface:
                     self.progress.setValue(int((r * BUFFER_SIZE) / divider))
                     progress.update(len(bytes_read))
 
-                    if len(bytes_read) < 1024:
+                    if len(bytes_read) < BUFFER_SIZE:
                         success = True
                         break
 
@@ -315,10 +370,9 @@ class Interface:
                 self.showSuccessDialog("Download complete")
                 self.clearForm()
 
-
     def setInputFilename(self):
         filter = None
-        prename = self.mode+"Data/"
+        prename = self.mode + "Data/"
         if not self.isEncrypt:
             filter = "(*.enc)"
             self.outputFilename = prename
@@ -368,14 +422,13 @@ class Interface:
                 return
             self.privateKey.setText(self.privateKeyPath)
 
-
     def generateKeys(self):
         print("generateKeys")
         key = RSA.generate(2048)
         private_key = key.export_key()
         public_key = key.publickey().export_key()
 
-        path = self.mode+"Data/"
+        path = self.mode + "Data/"
         password, done1 = QInputDialog.getText(self.widget, 'Input Dialog', 'Enter password:')
         if not done1:
             return
@@ -389,13 +442,6 @@ class Interface:
     def setIsEncrypt(self, isEncrypt):
         self.isEncrypt = isEncrypt
         self.clearForm()
-        # tmp = self.inputFilename
-        # self.inputFilename = self.outputFilename
-        # self.outputFilename = tmp
-        # self.outputFile.setText(self.outputFilename) if self.outputFilename != "" else self.outputFile.setText(
-        #     "Choose output file")
-        # self.inputFile.setText(self.inputFilename) if self.inputFilename != "" else self.inputFile.setText(
-        #     "Choose input file")
 
     def setIsCBC(self, isCBC):
         self.isCBC = isCBC

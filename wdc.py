@@ -100,10 +100,10 @@ def decryptCBC(input_file, output_path, key):
     with open(output_path + filename, "wb") as f:
         f.write(data)
 
+
 def encrypt_message(message, key, isCBC):
     key = RSA.import_key(key)
-
-    if isCBC == True:
+    if isCBC:
         k = get_random_bytes(16)
         c = AES.new(k, AES.MODE_CBC)
         c_data = c.encrypt(pad(bytes(message, 'utf-8'), AES.block_size))
@@ -113,7 +113,6 @@ def encrypt_message(message, key, isCBC):
         c_data = c.encrypt(bytes(message, 'utf-8'))
 
     ck = PKCS1_OAEP.new(key)
-
 
     filename = "message"
     filename = bytes(filename, 'utf-8')
@@ -131,9 +130,7 @@ def encrypt_message(message, key, isCBC):
 
 def decrypt_message(c_message, key, isCBC):
     key = RSA.import_key(key)
-
     bytes_message = io.BytesIO(c_message)
-
     filename_size = bytes_message.read(4)
     c_filename = bytes_message.read(int.from_bytes(filename_size, "little"))
     size = bytes_message.read(4)
@@ -143,10 +140,9 @@ def decrypt_message(c_message, key, isCBC):
 
     ck = PKCS1_OAEP.new(key)
     filename = ck.decrypt(c_filename)
-    filename = filename.decode("utf-8")
     k = ck.decrypt(c_k)
 
-    if isCBC == True:
+    if isCBC:
         c = AES.new(k, AES.MODE_CBC, iv=iv)
         data = unpad(c.decrypt(data), AES.block_size)
     else:
@@ -154,6 +150,3 @@ def decrypt_message(c_message, key, isCBC):
         data = c.decrypt(data)
 
     return data.decode()
-
-
-

@@ -1,7 +1,6 @@
 import argparse
 import socket
 
-
 from Interface import Interface
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import sys
@@ -15,7 +14,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     window = QMainWindow()
-    window.resize(300, 300)
+    window.setFixedSize(900, 600)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--server", help="run program as server")
@@ -37,7 +36,7 @@ if __name__ == "__main__":
         files_socket.listen(3)
         chat_socket.listen(3)
 
-        print("Listening on port")
+        print("Listening on ports 9000 and 9001")
         client_files_socket, addr1 = files_socket.accept()
         client_chat_socket, addr2 = chat_socket.accept()
 
@@ -46,16 +45,20 @@ if __name__ == "__main__":
 
         files_socket.settimeout(2)
         chat_socket.settimeout(2)
+        try:
+            appInterface = Interface(window, client_files_socket, client_chat_socket)
+            appInterface.setStatus(True)
+            appInterface.mode = "Server"
+        except Exception as e:
+            print(e)
 
-        appInterface = Interface(window, client_files_socket, client_chat_socket)
-        appInterface.setStatus(True)
-        appInterface.mode = "Server"
-
-        app.exec_()
+        try:
+            app.exec_()
+        except Exception as e:
+            print(e)
 
         client_files_socket.close()
         client_chat_socket.close()
-
 
     elif args.client:
         # CLIENT Mode
@@ -66,12 +69,17 @@ if __name__ == "__main__":
 
         files_socket.connect(('localhost', 9000))
         chat_socket.connect(('localhost', 9001))
+        try:
+            appInterface = Interface(window, files_socket, chat_socket)
+            appInterface.setStatus(True)
+            appInterface.mode = "Client"
+        except Exception as e:
+            print(e)
 
-        appInterface = Interface(window, files_socket, chat_socket)
-        appInterface.setStatus(True)
-        appInterface.mode = "Client"
-
-        app.exec_()
+        try:
+            app.exec_()
+        except Exception as e:
+            print(e)
 
         files_socket.close()
         chat_socket.close()
@@ -81,8 +89,3 @@ if __name__ == "__main__":
         quit()
 
     sys.exit()
-
-
-
-
-
